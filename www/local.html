@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <title>📖 ComicHub 阅读器</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    body { overflow-x: hidden; }
+
+    /* ───────── 章节列表视图 ───────── */
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    .manga-head { display: flex; gap: 20px; margin-bottom: 24px; }
+    .manga-head .cover, .manga-head .ph {
+      width: 150px; aspect-ratio: 2/3; border-radius: 12px; object-fit: cover; flex-shrink: 0;
+      background: var(--card); display: grid; place-items: center; font-size: 48px; color: var(--text-faint);
+      box-shadow: 0 6px 20px var(--shadow);
+    }
+    .manga-head .meta { flex: 1; min-width: 0; }
+    .manga-head h1 { font-size: 26px; margin-bottom: 8px; }
+    .manga-head .author { color: var(--accent); font-size: 15px; margin-bottom: 12px; }
+    .manga-head .desc { color: var(--text-dim); font-size: 14px; line-height: 1.7; margin-bottom: 12px;
+      display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+    .manga-head .tags { display: flex; flex-wrap: wrap; gap: 7px; }
+    .manga-head .tag { font-size: 12px; padding: 4px 10px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; color: var(--text-dim); }
+
+    .ch-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .ch-toolbar h2 { font-size: 17px; }
+    .ch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .ch-item {
+      padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      cursor: pointer; transition: all .15s; position: relative; overflow: hidden;
+    }
+    .ch-item:hover { background: var(--card-hover); border-color: var(--accent); }
+    .ch-item.read { color: var(--text-dim); }
+    .ch-item.current { border-color: var(--accent); }
+    .ch-item .ct { font-size: 14px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+    .ch-item .cp { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+    .ch-item .dot { position: absolute; top: 10px; right: 10px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+    /* ───────── 阅读器 ───────── */
+    .reader-root { display: none; }
+    body.reading { background: #000; }
+    body.reading .wrap { display: none; }
+
+    .r-top {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+      display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+      background: var(--overlay); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border);
+      transition: transform .25s; color: var(--text);
+    }
+    .r-top.hidden { transform: translateY(-100%); }
+    .r-top .title { flex: 1; min-width: 0; font-size: 15px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .r-top .pageno { font-size: 13px; color: var(--text-dim); white-space: nowrap; }
+
+    /* 卷轴模式 */
+    .scroll-view { max-width: 900px; margin: 0 auto; padding-top: 56px; }
+    .scroll-view img { width: 100%; display: block; }
+
+    /* 翻页模式 */
+    .paged-view { position: fixed; inset: 0; display: none; overflow: hidden; touch-action: none; }
+    .paged-view .stage { position: absolute; inset: 0; display: grid; place-items: center; }
+    .paged-view img {
+      max-width: 100%; max-height: 100vh; object-fit: contain; user-select: none;
+      transition: opacity .2s; transform-origin: center center; will-change: transform;
+    }
+    .paged-view img.fade { opacity: 0; }
+    .tap-zone { position: absolute; top: 0; bottom: 0; width: 32%; z-index: 5; cursor: pointer; }
+    .tap-zone.left { left: 0; }
+    .tap-zone.right { right: 0; }
+
+    /* 缩略图条 */
+    .thumbs {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+      display: flex; gap: 8px; padding: 10px; overflow-x: auto; overflow-y: hidden;
+      background: var(--overlay); backdrop-filter: blur(8px); border-top: 1px solid var(--border);
+      transition: transform .25s; scrollbar-width: thin;
+    }
+    .thumbs.hidden { transform: translateY(110%); }
+    .thumbs img {
+      height: 90px; width: auto; border-radius: 6px; cursor: pointer; flex-shrink: 0;
+      border: 2px solid transparent; opacity: .55; transition: all .15s; background: var(--card);
+    }
+    .thumbs img:hover { opacity: .85; }
+    .thumbs img.active { border-color: var(--accent); opacity: 1; }
+
+    /* 章节导航条 (卷轴底部) */
+    .ch-nav { display: flex; gap: 12px; justify-content: center; padding: 30px 16px 90px; max-width: 900px; margin: 0 auto; }
+
+    .toast {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: var(--overlay); backdrop-filter: blur(8px); color: var(--text);
+      padding: 14px 24px; border-radius: 12px; font-size: 15px; z-index: 60;
+      border: 1px solid var(--border); opacity: 0; transition: opacity .2s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    @media (max-width: 640px) {
+      .manga-head { gap: 14px; }
+      .manga-head .cover, .manga-head .ph { width: 110px; font-size: 36px; }
+      .manga-head h1 { font-size: 20px; }
+      .ch-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+      .thumbs img { height: 64px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- 顶栏 (列表视图) -->
+  <div class="topbar" id="listTop">
+    <a class="brand" href="/">📚 ComicHub</a>
+    <a class="navlink" href="/">← 书架</a>
+    <span class="spacer"></span>
+    <button class="icon-btn" title="切换主题" onclick="CH.toggleTheme()">🌓</button>
+  </div>
+
+  <div class="wrap" id="listView">
+    <div class="loading"><div class="spinner"></div>加载中...</div>
+  </div>
+
+  <!-- 阅读器 -->
+  <div class="reader-root" id="reader">
+    <div class="r-top" id="rTop">
+      <button class="icon-btn" title="返回目录" onclick="Reader.exit()">✕</button>
+      <span class="title" id="rTitle"></span>
+      <span class="pageno" id="rPageNo"></span>
+      <button class="icon-btn" id="modeBtn" title="切换阅读模式" onclick="Reader.toggleMode()">📜</button>
+      <button class="icon-btn" title="缩略图" onclick="Reader.toggleThumbs()">🖼</button>
+      <button class="icon-btn" title="切换主题" onclick="CH.toggleTheme()">🌓</button>
+    </div>
+    <div class="scroll-view" id="scrollView"></div>
+    <div class="paged-view" id="pagedView">
+      <div class="tap-zone left" id="tzLeft"></div>
+      <div class="stage" id="pagedStage"></div>
+      <div class="tap-zone right" id="tzRight"></div>
+    </div>
+    <div class="thumbs hidden" id="thumbs"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/lib.js"></script>
+  <script>
+    const { h, $, $$ } = CH;
+    CH.initTheme();
+
+    const params = new URLSearchParams(location.search);
+    const SLUG = params.get('slug');
+    let manga = null, chapters = [], chIndex = -1;
+
+    function toast(msg) {
+      const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+      clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 1400);
+    }
+
+    // ───────── 列表视图 ─────────
+    async function initList() {
+      if (!SLUG) { location.href = '/'; return; }
+      manga = await CH.getMangaMeta(SLUG) || { slug: SLUG, title: SLUG };
+      chapters = await CH.getChapters(SLUG);
+      renderList();
+
+      // 自动恢复 / 指定章节
+      const reqCh = params.get('ch');
+      const resume = params.get('resume');
+      if (reqCh) { const i = chapters.findIndex(c => c.dir === reqCh); if (i >= 0) Reader.open(i); }
+      else if (resume) { const p = CH.getProgress(SLUG); if (p) { const i = chapters.findIndex(c => c.dir === p.chapterDir); if (i >= 0) Reader.open(i, p); } }
+    }
+
+    function renderList() {
+      const v = $('#listView');
+      const prog = CH.getProgress(SLUG);
+      const cover = manga.coverUrl
+        ? h('img', { className: 'cover', src: manga.coverUrl, onerror: function () { this.replaceWith(h('div', { className: 'ph' }, '📚')); } })
+        : h('div', { className: 'ph' }, '📚');
+      v.innerHTML = '';
+      v.append(
+        h('div', { className: 'manga-head' },
+          cover,
+          h('div', { className: 'meta' },
+            h('h1', {}, manga.title || SLUG),
+            manga.author ? h('div', { className: 'author' }, '✍ ' + manga.author) : null,
+            manga.description ? h('div', { className: 'desc' }, manga.description) : null,
+            manga.tags && manga.tags.length ? h('div', { className: 'tags' }, manga.tags.map(t => h('span', { className: 'tag' }, t))) : null,
+            h('div', { style: { marginTop: '14px', display: 'flex', gap: '10px' } },
+              h('button', { className: 'btn primary', onclick: () => resumeOrStart() },
+                prog ? '▶ 继续阅读' : '▶ 开始阅读'),
+              prog ? h('span', { className: 'muted', style: { alignSelf: 'center', fontSize: '13px' } },
+                (prog.chapterTitle || '') + ' · ' + CH.timeAgo(prog.at)) : null
+            )
+          )
+        ),
+        h('div', { className: 'ch-toolbar' }, h('h2', {}, '章节'), h('span', { className: 'muted' }, chapters.length + ' 话')),
+        chapters.length
+          ? h('div', { className: 'ch-grid' }, chapters.map((c, i) => {
+              const read = prog && chapters.findIndex(x => x.dir === prog.chapterDir) >= i;
+              const cur = prog && prog.chapterDir === c.dir;
+              return h('div', {
+                className: 'ch-item' + (cur ? ' current' : read ? ' read' : ''),
+                onclick: () => Reader.open(i)
+              },
+                h('div', { className: 'ct' }, c.title || c.dir),
+                c.pages ? h('div', { className: 'cp' }, c.pages + ' 页') : null,
+                cur ? h('span', { className: 'dot' }) : null
+              );
+            }))
+          : h('div', { className: 'empty' }, '暂无章节')
+      );
+    }
+
+    function resumeOrStart() {
+      const p = CH.getProgress(SLUG);
+      if (p) { const i = chapters.findIndex(c => c.dir === p.chapterDir); if (i >= 0) return Reader.open(i, p); }
+      Reader.open(0);
+    }
+
+    // ───────── 阅读器 ─────────
+    const Reader = {
+      pages: [], mode: localStorage.getItem('comichub.mode') || 'scroll',
+      page: 0, observer: null, _restorePage: 0,
+
+      async open(idx, resume) {
+        chIndex = idx;
+        const ch = chapters[idx];
+        this.pages = await CH.getPages(SLUG, ch.dir);
+        if (!this.pages.length) { toast('❌ 本章无图片'); return; }
+        this._restorePage = resume && resume.chapterDir === ch.dir ? (resume.page || 0) : 0;
+        this.page = this._restorePage;
+        document.body.classList.add('reading');
+        $('#reader').style.display = 'block';
+        $('#rTitle').textContent = `${manga.title || SLUG} · ${ch.title || ch.dir}`;
+        this.buildThumbs();
+        this.applyMode();
+        history.replaceState(null, '', `?slug=${encodeURIComponent(SLUG)}&ch=${encodeURIComponent(ch.dir)}`);
+        this.save();
+      },
+
+      exit() {
+        document.body.classList.remove('reading');
+        $('#reader').style.display = 'none';
+        if (this.observer) { this.observer.disconnect(); this.observer = null; }
+        history.replaceState(null, '', `?slug=${encodeURIComponent(SLUG)}`);
+        renderList();
+      },
+
+      applyMode() {
+        $('#modeBtn').textContent = this.mode === 'scroll' ? '📜' : '📄';
+        $('#scrollView').style.display = this.mode === 'scroll' ? 'block' : 'none';
+        $('#pagedView').style.display = this.mode === 'paged' ? 'block' : 'none';
+        if (this.mode === 'scroll') this.renderScroll(); else this.renderPaged();
+        this.updateUI();
+      },
+
+      toggleMode() {
+        this.mode = this.mode === 'scroll' ? 'paged' : 'scroll';
+        localStorage.setItem('comichub.mode', this.mode);
+        this._restorePage = this.page;
+        this.applyMode();
+        toast(this.mode === 'scroll' ? '📜 卷轴模式' : '📄 翻页模式');
+      },
+
+      // 卷轴模式
+      renderScroll() {
+        const v = $('#scrollView');
+        v.innerHTML = '';
+        this.pages.forEach((url, i) => {
+          v.append(h('img', { src: url, loading: 'lazy', dataset: { idx: i } }));
+        });
+        v.append(h('div', { className: 'ch-nav' },
+          h('button', { className: 'btn', disabled: chIndex <= 0, onclick: () => this.prevChapter() }, '← 上一章'),
+          h('button', { className: 'btn primary', disabled: chIndex >= chapters.length - 1, onclick: () => this.nextChapter() }, '下一章 →')
+        ));
+        if (this.observer) this.observer.disconnect();
+        this.observer = new IntersectionObserver(entries => {
+          entries.forEach(e => { if (e.isIntersecting) { this.page = +e.target.dataset.idx; this.updateUI(); this.save(); } });
+        }, { threshold: 0.5 });
+        $$('#scrollView img').forEach(img => this.observer.observe(img));
+        // 恢复滚动位置
+        requestAnimationFrame(() => {
+          const target = $$('#scrollView img')[this._restorePage];
+          if (target) target.scrollIntoView();
+        });
+      },
+
+      // 翻页模式
+      renderPaged() {
+        if (this.observer) { this.observer.disconnect(); this.observer = null; }
+        this.showPaged();
+      },
+      showPaged() {
+        const stage = $('#pagedStage');
+        stage.innerHTML = '';
+        const img = h('img', { src: this.pages[this.page], className: 'fade' });
+        img.onload = () => img.classList.remove('fade');
+        requestAnimationFrame(() => img.classList.remove('fade'));
+        // 预载相邻
+        [this.page - 1, this.page + 1].forEach(i => { if (this.pages[i]) new Image().src = this.pages[i]; });
+        Zoom.attach(img);
+        stage.append(img);
+        this.updateUI();
+        this.save();
+      },
+
+      go(delta) {
+        const np = this.page + delta;
+        if (np < 0) { if (chIndex > 0) this.prevChapter(true); return; }
+        if (np >= this.pages.length) { if (chIndex < chapters.length - 1) this.nextChapter(); else toast('已是最后一页'); return; }
+        this.page = np;
+        if (this.mode === 'paged') this.showPaged();
+        else { const t = $$('#scrollView img')[this.page]; if (t) t.scrollIntoView({ behavior: 'smooth' }); }
+      },
+
+      jump(i) {
+        this.page = i;
+        if (this.mode === 'paged') this.showPaged();
+        else { const t = $$('#scrollView img')[i]; if (t) t.scrollIntoView({ behavior: 'smooth' }); }
+      },
+
+      prevChapter(toEnd) { if (chIndex > 0) { const i = chIndex - 1; this._restoreToEnd = toEnd; Reader.openWithEnd(i, toEnd); } },
+      nextChapter() { if (chIndex < chapters.length - 1) Reader.open(chIndex + 1); },
+      async openWithEnd(i, toEnd) {
+        await this.open(i);
+        if (toEnd) { this.page = this.pages.length - 1; if (this.mode === 'paged') this.showPaged(); else this.jump(this.page); }
+      },
+
+      updateUI() {
+        $('#rPageNo').textContent = `${this.page + 1} / ${this.pages.length}`;
+        $$('#thumbs img').forEach((t, i) => {
+          t.classList.toggle('active', i === this.page);
+          if (i === this.page) t.scrollIntoView({ inline: 'center', block: 'nearest' });
+        });
+      },
+
+      buildThumbs() {
+        const box = $('#thumbs');
+        box.innerHTML = '';
+        this.pages.forEach((url, i) => {
+          box.append(h('img', { src: url, loading: 'lazy', title: '第' + (i + 1) + '页', onclick: () => this.jump(i) }));
+        });
+      },
+      toggleThumbs() { $('#thumbs').classList.toggle('hidden'); this.updateUI(); },
+
+      save() {
+        const ch = chapters[chIndex];
+        if (!ch) return;
+        CH.saveProgress(SLUG, {
+          chapterDir: ch.dir, chapterIndex: chIndex, chapterTitle: ch.title || ch.dir,
+          page: this.page, pageRatio: this.pages.length ? this.page / this.pages.length : 0,
+        });
+      },
+    };
+    window.Reader = Reader;
+
+    // ───────── 缩放/平移 (翻页模式手势) ─────────
+    const Zoom = {
+      img: null, scale: 1, tx: 0, ty: 0,
+      attach(img) {
+        this.img = img; this.scale = 1; this.tx = 0; this.ty = 0; this.apply();
+      },
+      apply() { if (this.img) this.img.style.transform = `translate(${this.tx}px,${this.ty}px) scale(${this.scale})`; },
+      reset() { this.scale = 1; this.tx = 0; this.ty = 0; this.apply(); },
+    };
+
+    // 触摸手势 (翻页模式)
+    (function () {
+      const pv = $('#pagedView');
+      let sx = 0, sy = 0, st = 0, moved = false;
+      let pinchStart = 0, baseScale = 1, lastTap = 0;
+      let panX = 0, panY = 0, baseTx = 0, baseTy = 0;
+
+      const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
+      pv.addEventListener('touchstart', e => {
+        if (e.touches.length === 2) {
+          pinchStart = dist(e.touches); baseScale = Zoom.scale;
+          baseTx = Zoom.tx; baseTy = Zoom.ty;
+          panX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          panY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        } else if (e.touches.length === 1) {
+          sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now(); moved = false;
+          baseTx = Zoom.tx; baseTy = Zoom.ty;
+        }
+      }, { passive: true });
+
+      pv.addEventListener('touchmove', e => {
+        if (e.touches.length === 2 && pinchStart) {
+          const s = Math.min(5, Math.max(1, baseScale * dist(e.touches) / pinchStart));
+          Zoom.scale = s; Zoom.apply(); moved = true;
+        } else if (e.touches.length === 1 && Zoom.scale > 1) {
+          // 平移已放大的图片
+          Zoom.tx = baseTx + (e.touches[0].clientX - sx);
+          Zoom.ty = baseTy + (e.touches[0].clientY - sy);
+          Zoom.apply(); moved = true;
+        } else if (e.touches.length === 1) {
+          if (Math.abs(e.touches[0].clientX - sx) > 8) moved = true;
+        }
+      }, { passive: true });
+
+      pv.addEventListener('touchend', e => {
+        if (pinchStart) { pinchStart = 0; if (Zoom.scale < 1.05) Zoom.reset(); return; }
+        if (Zoom.scale > 1) return; // 放大时不翻页
+        const dx = (e.changedTouches[0].clientX - sx);
+        const dy = (e.changedTouches[0].clientY - sy);
+        const dt = Date.now() - st;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+          Reader.go(dx < 0 ? 1 : -1);  // 左滑下一页
+        } else if (!moved && dt < 250) {
+          // 双击缩放
+          const now = Date.now();
+          if (now - lastTap < 300) { Zoom.scale = Zoom.scale > 1 ? 1 : 2; Zoom.apply(); lastTap = 0; }
+          else lastTap = now;
+        }
+      }, { passive: true });
+    })();
+
+    // 点击区域翻页 (翻页模式桌面)
+    $('#tzLeft').onclick = () => Reader.go(-1);
+    $('#tzRight').onclick = () => Reader.go(1);
+
+    // ───────── 键盘 ─────────
+    document.addEventListener('keydown', e => {
+      if (!document.body.classList.contains('reading')) return;
+      switch (e.key) {
+        case 'ArrowRight': case 'ArrowDown': e.preventDefault(); Reader.go(1); break;
+        case 'ArrowLeft': case 'ArrowUp': e.preventDefault(); Reader.go(-1); break;
+        case ' ': e.preventDefault(); Reader.nextChapter(); break;
+        case 'Escape': Reader.exit(); break;
+        case 'm': case 'M': Reader.toggleMode(); break;
+      }
+    });
+
+    // 自动隐藏顶栏 (卷轴模式下滚动)
+    let lastScroll = 0;
+    window.addEventListener('scroll', () => {
+      if (Reader.mode !== 'scroll' || !document.body.classList.contains('reading')) return;
+      const y = window.scrollY;
+      $('#rTop').classList.toggle('hidden', y > lastScroll && y > 120);
+      lastScroll = y;
+    }, { passive: true });
+
+    initList();
+  </script>
+</body>
+</html>

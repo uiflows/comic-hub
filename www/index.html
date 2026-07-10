@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📚 ComicHub</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+    .tabs { display: flex; gap: 6px; }
+    .tab {
+      padding: 8px 16px; border-radius: 9px; cursor: pointer; font-size: 15px;
+      color: var(--text-dim); border: 1px solid transparent;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: #fff; background: var(--accent); }
+
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 20px; }
+    .toolbar .input { flex: 1; min-width: 200px; }
+    select.input { cursor: pointer; }
+
+    /* 继续阅读 */
+    .continue { margin-bottom: 24px; }
+    .continue h2 { font-size: 15px; color: var(--text-dim); margin-bottom: 10px; font-weight: 600; }
+    .continue-row { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
+    .continue-card {
+      display: flex; gap: 12px; min-width: 280px; padding: 12px; background: var(--card);
+      border: 1px solid var(--border); border-radius: 12px; cursor: pointer; transition: all .15s;
+    }
+    .continue-card:hover { background: var(--card-hover); transform: translateY(-2px); }
+    .continue-card img, .continue-card .ph {
+      width: 54px; height: 76px; border-radius: 7px; object-fit: cover; flex-shrink: 0;
+      background: var(--bg-soft); display: grid; place-items: center; font-size: 22px;
+    }
+    .continue-card .c-title { font-size: 15px; font-weight: 600; margin-bottom: 4px;
+      display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+    .continue-card .c-sub { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+
+    /* 网格视图 */
+    .grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 18px;
+    }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      overflow: hidden; cursor: pointer; transition: transform .18s, box-shadow .18s, background .18s;
+    }
+    .card:hover { transform: translateY(-4px); box-shadow: 0 10px 28px var(--shadow); }
+    .card .cover { position: relative; aspect-ratio: 2/3; background: var(--bg-soft); }
+    .card .cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .card .cover .ph { width: 100%; height: 100%; display: grid; place-items: center; font-size: 40px; color: var(--text-faint); }
+    .card .badge {
+      position: absolute; top: 8px; right: 8px; background: var(--overlay); color: var(--text);
+      font-size: 11px; padding: 3px 8px; border-radius: 20px; backdrop-filter: blur(4px);
+    }
+    .card .cover .progress-track { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; border-radius: 0; }
+    .card .info { padding: 10px 12px 12px; }
+    .card .info h3 {
+      font-size: 14px; line-height: 1.35; margin-bottom: 4px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .card .info .sub { font-size: 12px; color: var(--text-dim);
+      display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+
+    /* 列表视图 */
+    .list .card { display: flex; border-radius: 12px; }
+    .list .card .cover { width: 64px; aspect-ratio: auto; height: 90px; flex-shrink: 0; }
+    .list .card:hover { transform: translateX(4px); }
+    .list .card .info { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+    .list .card .info h3 { -webkit-line-clamp: 1; }
+    .list .badge { display: none; }
+
+    .tags { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 18px; }
+    .chip {
+      padding: 6px 14px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; font-size: 13px; cursor: pointer; color: var(--text-dim); transition: all .15s;
+    }
+    .chip:hover, .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    @media (max-width: 600px) {
+      .grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; }
+      .topbar .brand { font-size: 17px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <span class="brand">📚 ComicHub</span>
+    <div class="tabs">
+      <span class="tab active" id="tab-local" onclick="switchTab('local')">本地书架</span>
+      <span class="tab" id="tab-dex" onclick="switchTab('dex')">MangaDex 搜索</span>
+    </div>
+    <span class="spacer"></span>
+    <button class="icon-btn" id="themeBtn" title="切换主题" onclick="onTheme()">🌓</button>
+  </div>
+
+  <div class="wrap">
+    <!-- 本地书架 -->
+    <section id="view-local">
+      <div id="continue"></div>
+      <div class="toolbar">
+        <input class="input" id="q" placeholder="🔍 搜索本地漫画..." oninput="renderShelf()">
+        <select class="input" id="sort" onchange="renderShelf()">
+          <option value="recent">最近阅读</option>
+          <option value="name">名称</option>
+          <option value="chapters">章节数</option>
+        </select>
+        <button class="icon-btn" id="viewBtn" title="切换视图" onclick="toggleView()">▦</button>
+      </div>
+      <div id="shelf"><div class="loading"><div class="spinner"></div>加载书架...</div></div>
+    </section>
+
+    <!-- MangaDex 搜索 -->
+    <section id="view-dex" style="display:none">
+      <div class="toolbar">
+        <input class="input" id="dexq" placeholder="🔍 搜索 MangaDex..." onkeydown="if(event.key==='Enter')dexSearch()">
+        <button class="btn primary" onclick="dexSearch()">搜索</button>
+      </div>
+      <div class="tags" id="dexTags"></div>
+      <div class="grid" id="dexGrid"></div>
+    </section>
+  </div>
+
+  <script src="/lib.js"></script>
+  <script>
+    const { h, $ } = CH;
+    CH.initTheme();
+    function onTheme() { CH.toggleTheme(); }
+
+    let shelfData = [];
+    let viewMode = localStorage.getItem('comichub.view') || 'grid';
+
+    // ───────── 标签切换 ─────────
+    function switchTab(t) {
+      $('#tab-local').classList.toggle('active', t === 'local');
+      $('#tab-dex').classList.toggle('active', t === 'dex');
+      $('#view-local').style.display = t === 'local' ? '' : 'none';
+      $('#view-dex').style.display = t === 'dex' ? '' : 'none';
+      if (t === 'dex' && !dexLoaded) { dexLoaded = true; loadDex(); }
+    }
+
+    function toggleView() {
+      viewMode = viewMode === 'grid' ? 'list' : 'grid';
+      localStorage.setItem('comichub.view', viewMode);
+      renderShelf();
+    }
+
+    // ───────── 本地书架 ─────────
+    async function initShelf() {
+      shelfData = await CH.getMangaList();
+      renderContinue();
+      renderShelf();
+    }
+
+    function progressOf(slug) {
+      const m = shelfData.find(x => x.slug === slug);
+      const total = m && m.chapters ? (Array.isArray(m.chapters) ? m.chapters.length : m.chapters) : 0;
+      const p = CH.getProgress(slug);
+      if (!p || !total) return { pct: 0, p };
+      const idx = (p.chapterIndex != null ? p.chapterIndex : 0) + (p.pageRatio || 0);
+      return { pct: Math.min(100, Math.round((idx / total) * 100)), p };
+    }
+
+    function renderContinue() {
+      const recents = CH.recentReads().filter(r => shelfData.some(m => m.slug === r.slug)).slice(0, 8);
+      const box = $('#continue');
+      if (!recents.length) { box.innerHTML = ''; return; }
+      box.innerHTML = '';
+      box.append(h('div', { className: 'continue' },
+        h('h2', {}, '▶ 继续阅读'),
+        h('div', { className: 'continue-row' },
+          recents.map(r => {
+            const m = shelfData.find(x => x.slug === r.slug) || {};
+            const img = m.coverUrl
+              ? h('img', { src: m.coverUrl, loading: 'lazy', onerror: function () { this.replaceWith(h('div', { className: 'ph' }, '📖')); } })
+              : h('div', { className: 'ph' }, '📖');
+            const { pct } = progressOf(r.slug);
+            return h('div', {
+              className: 'continue-card',
+              onclick: () => location.href = `/local.html?slug=${encodeURIComponent(r.slug)}&resume=1`
+            },
+              img,
+              h('div', { style: { minWidth: 0, flex: 1 } },
+                h('div', { className: 'c-title' }, m.title || r.slug),
+                h('div', { className: 'c-sub' }, (r.chapterTitle || '未知章节') + ' · ' + CH.timeAgo(r.at)),
+                h('div', { className: 'progress-track' }, h('div', { className: 'progress-fill', style: { width: pct + '%' } }))
+              )
+            );
+          })
+        )
+      ));
+    }
+
+    function renderShelf() {
+      const box = $('#shelf');
+      const q = $('#q').value.trim().toLowerCase();
+      const sort = $('#sort').value;
+      $('#viewBtn').textContent = viewMode === 'grid' ? '☰' : '▦';
+
+      let items = shelfData.filter(m =>
+        !q || (m.title || '').toLowerCase().includes(q) ||
+        (m.slug || '').toLowerCase().includes(q) ||
+        (m.author || '').toLowerCase().includes(q)
+      );
+
+      const chCount = m => Array.isArray(m.chapters) ? m.chapters.length : (m.chapters || 0);
+      if (sort === 'name') items.sort((a, b) => (a.title || a.slug).localeCompare(b.title || b.slug, 'zh'));
+      else if (sort === 'chapters') items.sort((a, b) => chCount(b) - chCount(a));
+      else { // recent
+        const rank = {}; CH.recentReads().forEach((r, i) => rank[r.slug] = i);
+        items.sort((a, b) => (rank[a.slug] ?? 1e9) - (rank[b.slug] ?? 1e9));
+      }
+
+      if (!items.length) {
+        box.innerHTML = q
+          ? '<div class="empty">😕 没有匹配的漫画</div>'
+          : '<div class="empty">📭 书架空空<br><small>运行爬虫下载漫画：<br>python3 crawler/crawler.py &lt;slug&gt;</small></div>';
+        return;
+      }
+
+      box.className = viewMode === 'grid' ? 'grid' : 'list';
+      box.innerHTML = '';
+      items.forEach(m => {
+        const n = chCount(m);
+        const { pct } = progressOf(m.slug);
+        const cover = m.coverUrl
+          ? h('img', { src: m.coverUrl, loading: 'lazy', alt: m.title, onerror: function () { this.replaceWith(h('div', { className: 'ph' }, '📚')); } })
+          : h('div', { className: 'ph' }, '📚');
+        box.append(h('div', {
+          className: 'card',
+          onclick: () => location.href = `/local.html?slug=${encodeURIComponent(m.slug)}`
+        },
+          h('div', { className: 'cover' },
+            cover,
+            n ? h('span', { className: 'badge' }, n + ' 话') : null,
+            pct > 0 ? h('div', { className: 'progress-track' }, h('div', { className: 'progress-fill', style: { width: pct + '%' } })) : null
+          ),
+          h('div', { className: 'info' },
+            h('h3', {}, m.title || m.slug),
+            h('div', { className: 'sub' }, m.author || (m._fallback ? m.slug : '未知作者'))
+          )
+        ));
+      });
+    }
+
+    initShelf();
+
+    // ───────── MangaDex 搜索 (沿用原逻辑) ─────────
+    const API = '/api';
+    let dexLoaded = false, currentTag = '';
+    const popularTags = [
+      { id: '', name: '🔥 热门' },
+      { id: '4d32cc48-9f00-4cca-9b5a-a839f0764984', name: '动作' },
+      { id: '423e2eae-a7a2-4a8b-ac03-a8351462d71d', name: '恋爱' },
+      { id: '97893a4c-12af-4dac-b6be-0dffb353568e', name: '搞笑' },
+      { id: 'b9af3a63-f058-46de-a9a0-e0c13906197a', name: '冒险' },
+      { id: '391b0423-d847-456f-aff0-8b0cfc03066b', name: '奇幻' },
+      { id: 'e5301a23-ebd9-49dd-a0cb-2add944c7fe9', name: '悬疑' },
+      { id: 'f42fbf9e-188a-447b-9fdc-f19dc1e4d685', name: '科幻' },
+    ];
+    function loadDex() {
+      $('#dexTags').innerHTML = popularTags.map(t =>
+        `<span class="chip${currentTag === t.id ? ' active' : ''}" data-id="${t.id}">${t.name}</span>`).join('');
+      $('#dexTags').querySelectorAll('.chip').forEach(c =>
+        c.onclick = () => { currentTag = c.dataset.id; loadDex(); dexFetch(); });
+      dexFetch();
+    }
+    function dexSearch() { currentTag = ''; dexFetch($('#dexq').value.trim()); loadDex(); }
+    async function dexFetch(query = '') {
+      const grid = $('#dexGrid');
+      grid.innerHTML = '<div class="loading"><div class="spinner"></div>加载中</div>';
+      try {
+        const p = new URLSearchParams();
+        p.append('limit', '32');
+        p.append('includes[]', 'cover_art');
+        p.append('contentRating[]', 'safe');
+        p.append('contentRating[]', 'suggestive');
+        if (query) { p.append('title', query); p.append('order[relevance]', 'desc'); }
+        else p.append('order[followedCount]', 'desc');
+        if (currentTag) p.append('includedTags[]', currentTag);
+        const res = await fetch(`${API}/manga?${p}`);
+        const data = await res.json();
+        if (!data.data || !data.data.length) { grid.innerHTML = '<div class="empty">😕 没找到漫画</div>'; return; }
+        grid.innerHTML = data.data.map(m => {
+          const title = m.attributes.title.en || Object.values(m.attributes.title)[0] || '未知';
+          const cr = m.relationships.find(r => r.type === 'cover_art');
+          const cf = cr?.attributes?.fileName;
+          const cover = cf ? `/covers/${m.id}/${cf}.256.jpg`
+            : 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="384"><rect width="256" height="384" fill="%231a1a2e"/></svg>';
+          const st = m.attributes.status === 'ongoing' ? '连载中' : '已完结';
+          return `<div class="card" onclick="window.open('https://mangadex.org/title/${m.id}','_blank')">
+            <div class="cover"><img src="${cover}" alt="" loading="lazy"></div>
+            <div class="info"><h3>${title}</h3><div class="sub">${st} ${m.attributes.year || ''}</div></div></div>`;
+        }).join('');
+      } catch (e) {
+        grid.innerHTML = `<div class="empty">⚠️ 加载失败: ${e.message}</div>`;
+      }
+    }
+  </script>
+</body>
+</html>

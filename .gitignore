@@ -1,0 +1,24 @@
+# Cloudflare Tunnel credentials (NEVER commit)
+.cloudflare-tunnel/
+
+# Cookies / sessions
+**/.cookies/
+
+# 漫画数据（版权内容 + 大文件）
+data/
+www/_tmp/
+
+# 环境变量
+.env
+.env.local
+
+# macOS
+.DS_Store
+._*
+
+# 日志
+*.log
+
+# Python
+__pycache__/
+*.py[cod]

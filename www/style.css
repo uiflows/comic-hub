@@ -1,0 +1,105 @@
+/* ComicHub 共享样式 — 主题变量 + 通用组件 */
+:root,
+:root[data-theme="dark"] {
+  --accent: #e94560;
+  --accent-hover: #c23152;
+  --bg: #0f0f0f;
+  --bg-soft: #15151f;
+  --card: #1a1a2e;
+  --card-hover: #24243a;
+  --border: #2a2a3e;
+  --text: #e8e8ea;
+  --text-dim: #9a9aa8;
+  --text-faint: #5a5a6a;
+  --shadow: rgba(0, 0, 0, .5);
+  --overlay: rgba(10, 10, 15, .92);
+}
+
+:root[data-theme="light"] {
+  --accent: #e94560;
+  --accent-hover: #c23152;
+  --bg: #f4f4f7;
+  --bg-soft: #ffffff;
+  --card: #ffffff;
+  --card-hover: #f0f0f4;
+  --border: #e2e2ea;
+  --text: #1a1a24;
+  --text-dim: #5a5a6a;
+  --text-faint: #9a9aa8;
+  --shadow: rgba(0, 0, 0, .12);
+  --overlay: rgba(255, 255, 255, .94);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei',
+    'Segoe UI', 'Hiragino Sans GB', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition: background .25s, color .25s;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* 顶栏 */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px 20px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.topbar .brand { font-size: 20px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.topbar .spacer { flex: 1; }
+.topbar a.navlink { color: var(--text-dim); font-size: 14px; padding: 6px 10px; border-radius: 8px; }
+.topbar a.navlink:hover { color: var(--text); background: var(--card-hover); }
+
+/* 按钮 */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card); color: var(--text);
+  font-size: 14px; cursor: pointer; transition: all .15s; user-select: none;
+}
+.btn:hover { background: var(--card-hover); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { background: var(--accent-hover); }
+.btn.icon { padding: 8px 10px; }
+.btn:disabled { opacity: .35; cursor: default; }
+
+.icon-btn {
+  width: 38px; height: 38px; display: grid; place-items: center;
+  border: 1px solid var(--border); border-radius: 9px; background: var(--card);
+  color: var(--text); cursor: pointer; font-size: 17px; transition: all .15s;
+}
+.icon-btn:hover { background: var(--card-hover); }
+
+/* 输入 */
+.input {
+  padding: 10px 14px; border: 1px solid var(--border); border-radius: 9px;
+  background: var(--bg-soft); color: var(--text); font-size: 15px; outline: none;
+  transition: border-color .15s;
+}
+.input:focus { border-color: var(--accent); }
+
+.muted { color: var(--text-dim); }
+.empty { text-align: center; padding: 64px 20px; color: var(--text-faint); font-size: 17px; line-height: 1.7; }
+.loading { text-align: center; padding: 48px; color: var(--text-dim); }
+.spinner {
+  width: 28px; height: 28px; margin: 0 auto 12px;
+  border: 3px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 进度条 */
+.progress-track { height: 4px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+::-webkit-scrollbar-track { background: transparent; }

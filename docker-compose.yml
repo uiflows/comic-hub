@@ -1,0 +1,20 @@
+services:
+  comichub:
+    build: .
+    image: comichub:latest
+    container_name: comichub
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${COMICHUB_PORT:-8080}:80"
+    volumes:
+      # 漫画数据 (爬虫输出) → nginx /data/ 提供
+      - ./data:/data/manga:ro
+      # 热更新前端，无需重新构建镜像 (开发便利)
+      - ./www:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s

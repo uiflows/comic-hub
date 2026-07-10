@@ -1,0 +1,7 @@
+data/
+.git/
+.DS_Store
+.cloudflare-tunnel/
+crawler/__pycache__/
+**/*.pyc
+*.log
